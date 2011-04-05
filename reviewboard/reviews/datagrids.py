@@ -317,6 +317,65 @@ class GroupMemberCountColumn(Column):
         return reverse('group_members', args=[group.name])
 
 
+class AllReviewIssuesClosedColumn(Column):
+    """
+    A column indicating whether all review issues are closed
+    """
+    def __init__(self, label=_("All Issues Closed?"),
+                 detailed_label=_("All Review Issues Closed"),
+                 *args, **kwargs):
+       Column.__init__(self, label=label, detailed_label=detailed_label,
+                       *kwargs, **kwargs)
+       self.shrink = True
+
+    def render_data(self, review_request):
+	if review_request.public_all_review_issues_closed == None:
+            return '1* (0/0)'
+        return review_request.public_all_review_issues_closed
+
+    def augment_queryset(self, queryset):
+
+        return queryset.extra(select={
+            'public_all_review_issues_closed': """
+            select concat(total=nresolved,' (',nresolved,'/',total,')')
+	    from
+            (select id, count(reply_to_id) as total,
+             sum(substr(rtrim(replace(text,'\n',' ')),-3,3)='@@@') as nresolved
+             from
+             (select id, reply_to_id, text from
+             (select a.id, a.reply_to_id, a.timestamp, a.text,
+              @order:=case when @request_id <> a.id or
+              @replyid <> a.reply_to_id
+              then 0 else @order+1 end as rn,
+              @request_id := a.id as request_id,
+              @replyid:=a.reply_to_id as replyid
+              from
+               (select @request_id := -1) k,
+               (select @order := -1) s,
+               (select @replyid := -1) c,
+               (select id,reply_to_id,text,timestamp
+               from
+                (
+                 select a.review_request_id as id,
+                 concat(ifnull(a.base_reply_to_id,a.id),'_') as reply_to_id,
+                 if(length(a.body_bottom)>0,a.body_bottom,a.body_top) as text,
+                 a.timestamp from reviews_review a where
+                 length(body_bottom)+length(body_top) > 0
+                 union all
+                 select a.review_request_id as id,
+                 ifnull(c.reply_to_id,c.id) as reply_to_id, c.text, c.timestamp
+                 from reviews_review a, reviews_review_comments b,
+                 reviews_comment c where a.id=b.review_id and b.comment_id=c.id
+                ) a order by id, reply_to_id, timestamp desc
+               ) a
+              ) t where rn = 0
+             ) t group by id
+            ) t where id=reviews_reviewrequest.id
+            """
+        })
+
+
+
 class ReviewCountColumn(Column):
     """
     A column showing the number of reviews for a review request.
@@ -397,6 +456,7 @@ class ReviewRequestDataGrid(DataGrid):
         css_class=lambda r: ageid(r.last_updated))
 
     review_count = ReviewCountColumn()
+    all_review_issues_closed = AllReviewIssuesClosedColumn()
 
     review_id = Column(_("Review ID"), field_name="id", db_field="id",
                        shrink=True, sortable=True, link=True)
