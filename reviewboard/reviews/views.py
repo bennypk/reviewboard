@@ -44,7 +44,8 @@ from reviewboard.reviews.forms import NewReviewRequestForm, \
                                       UploadScreenshotForm
 from reviewboard.reviews.models import Comment, ReviewRequest, \
                                        ReviewRequestDraft, Review, Group, \
-                                       Screenshot, ScreenshotComment
+                                       Screenshot, ScreenshotComment, \
+                                       IssuesSummary
 from reviewboard.scmtools.core import PRE_CREATION
 from reviewboard.scmtools.errors import SCMError
 
@@ -854,3 +855,10 @@ def search(request, template_name='reviews/search.html'):
                        extra_context={'query': query,
                                       'extra_query': 'q=%s' % query,
                                      })
+
+def show_request_issues(request, show_all):
+    results = IssuesSummary.objects.all()
+    if show_all != 'all':
+       results = filter(lambda(x): x.is_closed()=='No', results)
+    return render_to_response('issue_list.html', { 'issues' : results })
+

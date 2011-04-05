@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% autoescape on %}
+
+{% block content %}
+
+<h1 class="header">Issues</h1>
+
+<table border="1">
+<tr><th>Request</th><th>Is Closed?</th><th>Num Addressed</th>
+{% for i in issues %}
+
+        <tr><td><a href="/reviews/r/{{ i.id }}/">{{ i.id }}</a></td><td>{{ i.is_closed }}</td><td>{{ i.num_resolved }}/{{ i.num_issues }}</td></tr>
+
+{% endfor %}
+</table>
+
+<br/>
+<a href="/accounts/logout">Log Out</a>
+{% endblock %}
+{% endautoescape %}
+

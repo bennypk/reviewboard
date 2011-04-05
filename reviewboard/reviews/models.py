@@ -171,6 +171,17 @@ class Screenshot(models.Model):
         })
 
 
+class IssuesSummary(models.Model):
+    id = models.AutoField(primary_key=True)
+    num_issues = models.IntegerField()
+    num_resolved = models.IntegerField()
+
+
+    def is_closed(self):
+        if self.num_issues==self.num_resolved:
+           return "Yes"
+        return "No"
+
 class ReviewRequest(models.Model):
     """
     A review request.
