@@ -317,6 +317,7 @@ class GroupMemberCountColumn(Column):
         return reverse('group_members', args=[group.name])
 
 
+# TODO: Use issue views instead of overly long SQL
 class AllReviewIssuesClosedColumn(Column):
     """
     A column indicating whether all review issues are closed
