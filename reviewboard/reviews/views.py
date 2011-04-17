@@ -37,7 +37,8 @@ from reviewboard.reviews.datagrids import DashboardDataGrid, \
                                           GroupDataGrid, \
                                           ReviewRequestDataGrid, \
                                           SubmitterDataGrid, \
-                                          WatchedGroupDataGrid
+                                          WatchedGroupDataGrid, \
+                                          IssuesSummaryDataGrid
 from reviewboard.reviews.errors import OwnershipError
 from reviewboard.reviews.forms import NewReviewRequestForm, \
                                       UploadDiffForm, \
@@ -321,12 +322,18 @@ def dashboard(request, template_name='reviews/dashboard.html'):
     """
     view = request.GET.get('view', None)
 
+
     if view == "watched-groups":
         # This is special. We want to return a list of groups, not
         # review requests.
         grid = WatchedGroupDataGrid(request)
     else:
         grid = DashboardDataGrid(request)
+    
+    if view == "issues":
+       results = IssuesSummary.objects.all()
+#       grid = IssuesSummaryDataGrid(request)
+       return render_to_response('issue_list.html', { 'issues' : results })
 
     return grid.render_to_response(template_name)
 

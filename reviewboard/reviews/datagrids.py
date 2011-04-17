@@ -1,3 +1,4 @@
+import logging
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
@@ -9,7 +10,7 @@ from djblets.datagrid.grids import Column, DateTimeColumn, \
 from djblets.util.templatetags.djblets_utils import ageid
 
 from reviewboard.accounts.models import Profile
-from reviewboard.reviews.models import Group, ReviewRequest
+from reviewboard.reviews.models import Group, ReviewRequest, IssuesSummary
 from reviewboard.reviews.templatetags.reviewtags import render_star
 
 
@@ -317,12 +318,12 @@ class GroupMemberCountColumn(Column):
         return reverse('group_members', args=[group.name])
 
 
-# TODO: Use issue views instead of overly long SQL
+# Added by BP
 class AllReviewIssuesClosedColumn(Column):
     """
-    A column indicating whether all review issues are closed
+    A column indicating whether all review issues are closed 
     """
-    def __init__(self, label=_("All Issues Closed?"),
+    def __init__(self, label=_("All Issues Closed?"), 
                  detailed_label=_("All Review Issues Closed"),
                  *args, **kwargs):
        Column.__init__(self, label=label, detailed_label=detailed_label,
@@ -332,7 +333,7 @@ class AllReviewIssuesClosedColumn(Column):
     def render_data(self, review_request):
 	if review_request.public_all_review_issues_closed == None:
             return '1* (0/0)'
-        return review_request.public_all_review_issues_closed
+        return review_request.public_all_review_issues_closed 
 
     def augment_queryset(self, queryset):
 
@@ -340,16 +341,16 @@ class AllReviewIssuesClosedColumn(Column):
             'public_all_review_issues_closed': """
             select concat(total=nresolved,' (',nresolved,'/',total,')')
 	    from
-            (select id, count(reply_to_id) as total,
+            (select id, count(reply_to_id) as total, 
              sum(substr(rtrim(replace(text,'\n',' ')),-3,3)='@@@') as nresolved
              from
              (select id, reply_to_id, text from
-             (select a.id, a.reply_to_id, a.timestamp, a.text,
-              @order:=case when @request_id <> a.id or
+             (select a.id, a.reply_to_id, a.timestamp, a.text, 
+              @order:=case when @request_id <> a.id or 
               @replyid <> a.reply_to_id
-              then 0 else @order+1 end as rn,
-              @request_id := a.id as request_id,
-              @replyid:=a.reply_to_id as replyid
+              then 0 else @order+1 end as rn, 
+              @request_id := a.id as request_id, 
+              @replyid:=a.reply_to_id as replyid 
               from
                (select @request_id := -1) k,
                (select @order := -1) s,
@@ -359,24 +360,24 @@ class AllReviewIssuesClosedColumn(Column):
                 (
                  select a.review_request_id as id,
                  concat(ifnull(a.base_reply_to_id,a.id),'_') as reply_to_id,
-                 if(length(a.body_bottom)>0,a.body_bottom,a.body_top) as text,
-                 a.timestamp from reviews_review a where
-                 length(body_bottom)+length(body_top) > 0
-                 union all
-                 select a.review_request_id as id,
+                 if(length(a.body_bottom)>0,a.body_bottom,a.body_top) as text, 
+                 a.timestamp from reviews_review a where 
+                 length(body_bottom)+length(body_top) > 0 
+                 union all 
+                 select a.review_request_id as id, 
                  ifnull(c.reply_to_id,c.id) as reply_to_id, c.text, c.timestamp
-                 from reviews_review a, reviews_review_comments b,
+                 from reviews_review a, reviews_review_comments b, 
                  reviews_comment c where a.id=b.review_id and b.comment_id=c.id
                 ) a order by id, reply_to_id, timestamp desc
                ) a
               ) t where rn = 0
              ) t group by id
             ) t where id=reviews_reviewrequest.id
-            """
+            """ 
         })
 
 
-
+              
 class ReviewCountColumn(Column):
     """
     A column showing the number of reviews for a review request.
@@ -408,6 +409,26 @@ class ReviewCountColumn(Column):
     def link_to_object(self, review_request, value):
         return "%s#last-review" % review_request.get_absolute_url()
 
+class IssuesSummaryDataGrid(DataGrid):
+    review_id = Column(_("Request ID"), db_field="review_request_id")
+    num_issues = Column(_("Num Issues"), db_field="num_issues")
+    num_resolved = Column(_("Num Resolved"), db_field="num_resolved")
+
+
+    def __init__(self, *args, **kwargs):
+        DataGrid.__init__(self, *args, **kwargs)
+        self.listview_template = 'datagrid/listview.html'
+        self.profile_sort_field = 'sort_dashboard_columns'
+        self.profile_columns_field = 'dashboard_columns'
+        self.show_submitted = True
+        self.submitter_url_name = "user"
+#        self.default_sort = ["-last_updated"]
+        self.default_columns = [
+            "review_id", "num_issues", "num_resolved"
+        ]
+    
+    def load_extra_state(self, profile):
+        return True
 
 class ReviewRequestDataGrid(DataGrid):
     """
@@ -471,7 +492,7 @@ class ReviewRequestDataGrid(DataGrid):
         self.submitter_url_name = "user"
         self.default_sort = ["-last_updated"]
         self.default_columns = [
-            "star", "summary", "submitter", "time_added", "last_updated_since"
+            "star", "summary", "submitter", "time_added", "last_updated_since", 
         ]
 
     def load_extra_state(self, profile):
@@ -574,6 +595,9 @@ class DashboardDataGrid(ReviewRequestDataGrid):
             self.queryset = \
                 profile.starred_review_requests.public(user)
             self.title = _(u"Starred Review Requests")
+        elif view == 'issues':
+            self.queryset = IssuesSummary.objects.all()
+            self.title = _(u"Issues Summary")
         else: # "incoming" or invalid
             self.queryset = ReviewRequest.objects.to_user(user, user)
             self.title = _(u"All Incoming Review Requests")
@@ -671,6 +695,7 @@ def get_sidebar_counts(user):
         'to-me': ReviewRequest.objects.to_user_directly(user, user).count(),
         'starred': profile.starred_review_requests.public(user).count(),
         'mine': ReviewRequest.objects.from_user(user, user, None).count(),
+        'issues': IssuesSummary.objects.all().count(), 
         'groups': {}
     }
 
