@@ -171,6 +171,7 @@ class Screenshot(models.Model):
         })
 
 
+# Class added by BP
 class IssuesSummary(models.Model):
     id = models.AutoField(primary_key=True)
     num_issues = models.IntegerField()
@@ -264,6 +265,9 @@ class ReviewRequest(models.Model):
                                                  blank=True)
     shipit_count = models.IntegerField(_("ship-it count"), default=0,
                                        null=True)
+    num_issues = models.IntegerField(default=0, null=False)
+    num_resolved = models.IntegerField(default=0, null=False)
+    is_closed = models.BooleanField(default=True, null=False)
 
 
     # Set this up with the ReviewRequestManager
@@ -459,6 +463,13 @@ class ReviewRequest(models.Model):
     def save(self, **kwargs):
         self.bugs_closed = self.bugs_closed.strip()
         self.summary = truncate(self.summary, MAX_SUMMARY_LENGTH)
+        try:
+            issues = IssuesSummary.objects.get(id=self.id)
+            self.num_issues = issues.num_issues
+            self.num_resolved = issues.num_resolved
+            self.is_closed = self.num_issues == self.num_resolved
+        except:
+            pass
 
         if self.status != "P":
             # If this is not a pending review request now, delete any
